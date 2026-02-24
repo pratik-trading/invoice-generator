@@ -12,39 +12,35 @@ export function InvoiceComponent({ invoiceNo, date, vehicleNo, receiverName, rec
   const invoiceRef = useRef();
 
   const downloadPDF = () => {
-    const invoice = document.getElementById("invoice");
-    if (!invoice) {
-      alert("Invoice element not found!");
-      return;
-    }
+  const invoice = document.getElementById("invoice");
+  if (!invoice) {
+    alert("Invoice element not found!");
+    return;
+  }
 
-    html2canvas(invoice, {
-      scale: 3,
-      useCORS: true,
-      logging: false,
-      windowWidth: 794, // match A4 width
-    })
-      .then((canvas) => {
-        const imgData = canvas.toDataURL("image/png");
-        const pdf = new jsPDF("p", "mm", "a4");
+  html2canvas(invoice, {
+    scale: 1.2,
+    useCORS: true,
+    logging: false,
+    windowWidth: 794,
+  }).then((canvas) => {
 
-        const pageWidth = pdf.internal.pageSize.getWidth();  // 210mm
-        const pageHeight = pdf.internal.pageSize.getHeight(); // 297mm
+    const imgData = canvas.toDataURL("image/jpeg", 0.6);
+    const pdf = new jsPDF("p", "mm", "a4");
 
-        // Add margin around invoice
-        const marginX = 25; // horizontal margin (left-right)
-        const marginY = 30; // vertical margin (top-bottom)
-        const extraBottomMargin = 25;
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const marginX = 25;
+    const marginY = 30;
 
-        const imgWidth = pageWidth - marginX * 2;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width - extraBottomMargin;
+    const imgWidth = pageWidth - marginX * 2;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-        pdf.addImage(imgData, "PNG", marginX, marginY, imgWidth, imgHeight);
-        const newDate = date.replaceAll(".","-")
-        pdf.save(`invoice-${invoiceNo}(${newDate})${receiverName}`);
-      })
-      .catch((err) => console.error("PDF generation error:", err));
-  };
+    pdf.addImage(imgData, "JPEG", marginX, marginY, imgWidth, imgHeight);
+
+    const newDate = date.replaceAll(".", "-");
+    pdf.save(`invoice-${invoiceNo}(${newDate})${receiverName}.pdf`);
+  });
+};
 
   <style>
     {`
