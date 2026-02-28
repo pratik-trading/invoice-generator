@@ -231,7 +231,7 @@ export function InvoiceComponent({ invoiceNo, date, vehicleNo, receiverName, rec
                 <tbody>
                   <tr>
                     <td className="border-r-2 border-black px-2 py-1 align-top text-center">1</td>
-                    <td className="border-r-2 border-black text-center align-middle p-1">MS SCRAP</td>
+                    <td className="border-r-2 border-black text-center align-middle p-1">SS SCRAP</td>
                     <td className="border-r-2  border-black px-2 py-1 align-top text-center">7204</td>
                     <td className="border-r-2  border-black px-2 py-1 align-top text-center">Kg</td>
                     <td className="border-r-2  border-black px-2 py-1 align-top text-right">{quantity}</td>
