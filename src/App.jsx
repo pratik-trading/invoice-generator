@@ -12,46 +12,49 @@ function App() {
   const [receiverName, setReceiverName] = useState(null)
   const [receiverAddress, setReceiverAddress] = useState(null)
   const [receiverGST, setReceiverGST] = useState(null)
-  const [quantity, setQuantity] = useState(null)
-  const [Rate, setRate] = useState(null)
-  const [amount, setAmount] = useState(null)
-  const [GST, setGST] = useState(null)
-  const [subTotal, setSubTotal] = useState(null)
-  const [RO, setRO] = useState(null)
+
+  const [productDetailsArray, setProductDetailsArray] = useState([])
+
+  const [totalQuantity, setTotalQuantity] = useState(0)
+  const [amount, setAmount] = useState(0)
+  const [GST, setGST] = useState(0)
+  const [subTotal, setSubTotal] = useState(0)
+  const [RO, setRO] = useState(0)
   const [grandTotal, setGrandTotal] = useState(0)
-  const [amountInWords, setAmountInWords] = useState(0)
+  const [amountInWords, setAmountInWords] = useState('')
 
   useEffect(() => {
-    setAmount(quantity * Rate)
-  }, [quantity, Rate])
+    if (productDetailsArray.length === 0) {
+      setTotalQuantity(0)
+      setAmount(0)
+      setGST(0)
+      setSubTotal(0)
+      setRO(0)
+      setGrandTotal(0)
+      setAmountInWords('')
+      return
+    }
 
-  useEffect(() => {
-    setGST(Number(9 * amount / 100).toFixed(1))
-  }, [amount])
+    const totalAmt = productDetailsArray.reduce((sum, p) => sum + p.amount, 0)
+    const totalQty = productDetailsArray.reduce((sum, p) => sum + Number(p.quantity), 0)
+    const gst = Number((9 * totalAmt / 100).toFixed(1))
+    const sub = Number((totalAmt + gst * 2).toFixed(1))
+    const rounded = Math.round(sub)
+    const ro = Number((rounded - sub).toFixed(2))
 
-  useEffect(() => {
-    setSubTotal(Number((amount + (GST * 2)).toFixed(1)))
-  }, [GST])
+    setTotalQuantity(totalQty)
+    setAmount(totalAmt)
+    setGST(gst)
+    setSubTotal(sub)
+    setRO(ro)
+    setGrandTotal(rounded)
 
-  useEffect(() => {
-    const rounded = Math.round(subTotal);
-    const ro = Number((rounded - subTotal).toFixed(2));
-    setRO(ro);
-  }, [subTotal, GST, grandTotal]);
-
-
-  useEffect(() => {
-    setGrandTotal(Math.round(subTotal))
-  }, [subTotal])
-
-  useEffect(() => {
     const toWords = new ToWords({
-      localeCode: 'en-IN', // Indian style
+      localeCode: 'en-IN',
       converterOptions: { currency: true, ignoreDecimal: false },
     });
-    const words = toWords.convert(grandTotal, { currency: true });
-    setAmountInWords(words.toUpperCase())
-  }, [grandTotal])  
+    setAmountInWords(toWords.convert(rounded, { currency: true }).toUpperCase())
+  }, [productDetailsArray])
 
   return (
     <div>
@@ -63,23 +66,24 @@ function App() {
         receiverName={receiverName} setReceiverName={setReceiverName}
         receiverAddress={receiverAddress} setReceiverAddress={setReceiverAddress}
         receiverGST={receiverGST} setReceiverGST={setReceiverGST}
-        quantity={quantity} setQuantity={setQuantity}
-        Rate={Rate} setRate={setRate}
+        productDetailsArray={productDetailsArray}
+        setProductDetailsArray={setProductDetailsArray}
       />
-      <InvoiceComponent invoiceNo={invoiceNo}
+      <InvoiceComponent
+        invoiceNo={invoiceNo}
         date={date}
         vehicleNo={vehicleNo}
         receiverName={receiverName}
         receiverAddress={receiverAddress}
         receiverGST={receiverGST}
-        quantity={quantity}
-        Rate={Rate}
+        totalQuantity={totalQuantity}
         amount={amount}
         GST={GST}
         subTotal={subTotal}
         RO={RO}
         grandTotal={grandTotal}
         amountInWords={amountInWords}
+        productDetailsArray={productDetailsArray}
       />
     </div>
   )

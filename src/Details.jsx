@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 const Details = ({
   invoiceNo, setInvoiceNo,
@@ -8,9 +8,13 @@ const Details = ({
   receiverName, setReceiverName,
   receiverAddress, setReceiverAddress,
   receiverGST, setReceiverGST,
-  quantity, setQuantity,
-  Rate, setRate
+  productDetailsArray, setProductDetailsArray,
 }) => {
+
+  const [productName, setProductName] = useState('M. S. Scrap')
+  const [HSN, setHSN] = useState(7204)
+  const [quantity, setQuantity] = useState('')
+  const [Rate, setRate] = useState('')
 
   const frequentReceivers = [
     {
@@ -65,6 +69,32 @@ const Details = ({
     }
   ];
 
+  const handleAddProduct = () => {
+    if (!productName || !HSN || !quantity || !Rate) {
+      alert("Please fill in all product fields (Product Name, HSN, Quantity, Rate).");
+      return;
+    }
+    const amt = Number(quantity) * Number(Rate);
+    const newProduct = {
+      id: Date.now(),
+      productName,
+      HSN,
+      quantity,
+      Rate,
+      amount: amt,
+    };
+    setProductDetailsArray(prev => [...prev, newProduct]);
+    // Reset product fields for next entry
+    setProductName('M. S. Scrap');
+    setHSN(7204);
+    setQuantity('');
+    setRate('');
+  };
+
+  const handleRemoveProduct = (id) => {
+    setProductDetailsArray(prev => prev.filter(p => p.id !== id));
+  };
+
   return (
     <div className="mx-auto bg-white shadow-lg rounded-2xl p-5 sm:p-6 mt-6 border border-gray-200 transition-all duration-300">
       <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-5 border-b pb-2 text-center sm:text-left">
@@ -115,39 +145,13 @@ const Details = ({
           />
         </div>
 
-        {/* Quantity */}
-        <div>
-          <label className="block text-gray-700 font-medium mb-1">Quantity</label>
-          <input
-            type="number" required
-            value={quantity || ""}
-            onChange={(e) => setQuantity(e.target.value)}
-            placeholder="Enter quantity"
-            className="w-full border border-gray-300 rounded-lg p-2 sm:p-2.5 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        {/* Rate */}
-        <div>
-          <label className="block text-gray-700 font-medium mb-1">Rate</label>
-          <input
-            type="number" required
-            value={Rate || ""}
-            onChange={(e) => setRate(e.target.value)}
-            placeholder="Enter rate"
-            className="w-full border border-gray-300 rounded-lg p-2 sm:p-2.5 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
         {/* Frequent Receiver Dropdown */}
         <div className="mb-4">
           <label className="block text-gray-700 font-medium mb-1">Select Frequent Receiver</label>
           <select
             className="w-full border border-gray-300 rounded-lg p-2 sm:p-2.5 text-sm sm:text-base bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             onChange={(e) => {
-              const selected = frequentReceivers.find(
-                r => r.name === e.target.value
-              );
+              const selected = frequentReceivers.find(r => r.name === e.target.value);
               if (selected) {
                 setReceiverName(selected.name);
                 setReceiverAddress(selected.address);
@@ -157,9 +161,7 @@ const Details = ({
           >
             <option value="">-- Select Receiver --</option>
             {frequentReceivers.map((r, index) => (
-              <option key={index} value={r.name}>
-                {r.name}
-              </option>
+              <option key={index} value={r.name}>{r.name}</option>
             ))}
           </select>
         </div>
@@ -198,6 +200,105 @@ const Details = ({
             className="w-full border border-gray-300 rounded-lg p-2 sm:p-2.5 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
+      </div>
+
+      {/* Product Entry Section */}
+      <div className="mt-6 border-t pt-5">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">Add Products</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+          <div>
+            <label className="block text-gray-700 font-medium mb-1">Product Name</label>
+            <input
+              type="text"
+              value={productName}
+              onChange={(e) => setProductName(e.target.value)}
+              placeholder="Enter Product Name"
+              className="w-full border border-gray-300 rounded-lg p-2 sm:p-2.5 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-gray-700 font-medium mb-1">HSN</label>
+            <input
+              type="number"
+              value={HSN}
+              onChange={(e) => setHSN(e.target.value)}
+              placeholder="Enter HSN"
+              className="w-full border border-gray-300 rounded-lg p-2 sm:p-2.5 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-gray-700 font-medium mb-1">Quantity</label>
+            <input
+              type="number"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              placeholder="Enter quantity"
+              className="w-full border border-gray-300 rounded-lg p-2 sm:p-2.5 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-gray-700 font-medium mb-1">Rate</label>
+            <input
+              type="number"
+              value={Rate}
+              onChange={(e) => setRate(e.target.value)}
+              placeholder="Enter rate"
+              className="w-full border border-gray-300 rounded-lg p-2 sm:p-2.5 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
+        <button
+          onClick={handleAddProduct}
+          className="mt-4 bg-green-600 text-white px-5 py-2 rounded-lg font-medium shadow-md hover:bg-green-700 transition-all duration-200 active:scale-95"
+        >
+          + Add Product
+        </button>
+
+        {/* Added Products List */}
+        {productDetailsArray.length > 0 && (
+          <div className="mt-5">
+            <h4 className="text-gray-700 font-semibold mb-2">Added Products:</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full border border-gray-300 rounded-lg text-sm">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="border border-gray-300 px-3 py-2 text-left">#</th>
+                    <th className="border border-gray-300 px-3 py-2 text-left">Product</th>
+                    <th className="border border-gray-300 px-3 py-2 text-left">HSN</th>
+                    <th className="border border-gray-300 px-3 py-2 text-right">Qty</th>
+                    <th className="border border-gray-300 px-3 py-2 text-right">Rate</th>
+                    <th className="border border-gray-300 px-3 py-2 text-right">Amount</th>
+                    <th className="border border-gray-300 px-3 py-2 text-center">Remove</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {productDetailsArray.map((p, index) => (
+                    <tr key={p.id} className="hover:bg-gray-50">
+                      <td className="border border-gray-300 px-3 py-2">{index + 1}</td>
+                      <td className="border border-gray-300 px-3 py-2">{p.productName}</td>
+                      <td className="border border-gray-300 px-3 py-2">{p.HSN}</td>
+                      <td className="border border-gray-300 px-3 py-2 text-right">{p.quantity}</td>
+                      <td className="border border-gray-300 px-3 py-2 text-right">{p.Rate}</td>
+                      <td className="border border-gray-300 px-3 py-2 text-right">{p.amount}</td>
+                      <td className="border border-gray-300 px-3 py-2 text-center">
+                        <button
+                          onClick={() => handleRemoveProduct(p.id)}
+                          className="text-red-500 hover:text-red-700 font-bold text-lg leading-none"
+                        >
+                          ×
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
