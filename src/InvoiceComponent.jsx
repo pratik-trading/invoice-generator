@@ -55,7 +55,7 @@ export function InvoiceComponent({ invoiceNo, date, vehicleNo, receiverName, rec
             <div className="grid grid-cols-2 border-b-2 border-black">
               <div className="border-r-2 border-black">
                 <strong className="flex"><div className="px-2 w-38">Reverse Charges</div><div className="px-2 flex-1">:</div><div className="px-2 flex-1">NO</div></strong>
-                <strong className="flex"><div className="px-2 w-38">Invoice No.</div><div className="px-2 flex-1">:</div><div className="flex-1">{invoiceNo}/2025-2026</div></strong>
+                <strong className="flex"><div className="px-2 w-38">Invoice No.</div><div className="px-2 flex-1">:</div><div className="flex-1">{invoiceNo}/2026-2027</div></strong>
                 <strong className="flex"><div className="px-2 w-38">Invoice Date</div><div className="px-2 flex-1">:</div><div className="px-2 flex-1">{date}</div></strong>
                 <strong className="flex"><div className="px-2 w-38">State</div><div className="px-2 flex-1">:</div><div className="px-2 flex-1">Maharashtra</div></strong>
                 <strong className="flex pb-2"><div className="px-2 w-38">State code</div><div className="px-2 flex-1">:</div><div className="px-2 flex-1">27</div></strong>
