@@ -45,7 +45,7 @@ export function InvoiceComponent({ invoiceNo, date, vehicleNo, receiverName, rec
               <strong className="pb-2">
                 <p className="mt-1">SNO.762, Surya Kiran Colony, Jyotiba Nagar, Pimpri</p>
                 <p>Pune – 411017, MAHARASHTRA</p>
-                <p>Mob.No.: 9850109435. Email: pratikv19370@gmail.com</p>
+                <p>Mob.No.: 9850109435. Email: pratikvj9370@gmail.com</p>
                 <p className="mt-1">OUR GST REG. NO.: 27BMAPJ2220A1ZY.</p>
               </strong>
             </div>
