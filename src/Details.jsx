@@ -66,6 +66,11 @@ const Details = ({
       name: "Poona steel corporation",
       address: "T General block BG 106/1, Midc Bhosari, Pune 411026",
       gst: "27AAKPC1794P1Z5"
+    },
+    {
+      name: "SHRI RAM ENTERPRISES",
+      address: "Sr. No. 16/1, S Block, Gulve Vasti, Bhosari, Pune 411026",
+      gst: "27ATAPV1928P1Z1"
     }
   ];
 
