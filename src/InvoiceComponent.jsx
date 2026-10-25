@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import { queueInvoiceSync, buildInvoicePayload, useScrapTradeSync } from "./scrapTradeSync";
 
 export function InvoiceComponent({ invoiceNo, date, vehicleNo, receiverName, receiverAddress, receiverGST, totalQuantity, amount, GST, subTotal, RO, grandTotal, amountInWords, productDetailsArray }) {
 
@@ -9,6 +10,7 @@ export function InvoiceComponent({ invoiceNo, date, vehicleNo, receiverName, rec
   };
 
   const invoiceRef = useRef();
+  const sync = useScrapTradeSync();
 
   const downloadPDF = () => {
     const invoice = document.getElementById("invoice");
@@ -23,6 +25,12 @@ export function InvoiceComponent({ invoiceNo, date, vehicleNo, receiverName, rec
       pdf.addImage(imgData, "JPEG", marginX, marginY, imgWidth, imgHeight);
       const newDate = date ? date.replaceAll(".", "-") : "nodate";
       pdf.save(`invoice-${invoiceNo}(${newDate})${receiverName}.pdf`);
+
+      // Save the sale in ScrapTrade in the background (never blocks the download)
+      try {
+        const payload = buildInvoicePayload({ invoiceNo, date, vehicleNo, receiverName, receiverAddress, receiverGST, productDetailsArray, GST, RO, grandTotal });
+        if (payload) queueInvoiceSync(payload, pdf.output("blob"));
+      } catch (e) { console.error("Could not queue ScrapTrade sync", e); }
     });
   };
 
@@ -36,6 +44,14 @@ export function InvoiceComponent({ invoiceNo, date, vehicleNo, receiverName, rec
           📄 Download PDF
         </button>
       </div>
+      {sync.status !== "idle" && (
+        <p className="text-center text-sm -mt-3 pb-2" style={{ color: sync.status === "saved" ? "#16a34a" : sync.status === "failed" ? "#dc2626" : "#d97706" }}>
+          {sync.status === "saving" && "Saving to ScrapTrade…"}
+          {sync.status === "saved" && "✓ Saved to ScrapTrade sales"}
+          {sync.status === "pending" && `⏳ ${sync.message} (${sync.pending} pending)`}
+          {sync.status === "failed" && `✗ ScrapTrade rejected the invoice: ${sync.message}`}
+        </p>
+      )}
 
       <div className="h-0 w-0 overflow-hidden">
         <div ref={invoiceRef} id="invoice" className="bg-white mx-auto" style={{ width: "794px", minHeight: "1123px", boxSizing: "border-box", margin: "0 auto" }}>
