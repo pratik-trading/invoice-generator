@@ -1,9 +1,14 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { queueInvoiceSync, buildInvoicePayload, useScrapTradeSync } from "./scrapTradeSync";
 
-export function InvoiceComponent({ invoiceNo, date, vehicleNo, receiverName, receiverAddress, receiverGST, totalQuantity, amount, GST, subTotal, RO, grandTotal, amountInWords, productDetailsArray }) {
+// WhatsApp number that receives the invoice, digits only with country code, e.g. 919850109435
+const WHATSAPP_NUMBER = String(import.meta.env.VITE_WHATSAPP_NUMBER || '').replace(/\D/g, '');
+// From this amount an e-way bill is needed (and the two PDFs are merged by hand), so no WhatsApp send
+const WHATSAPP_LIMIT = 100000;
+
+export function InvoiceComponent({ invoiceNo, fy, date, vehicleNo, receiverName, receiverAddress, receiverGST, totalQuantity, amount, GST, subTotal, RO, grandTotal, amountInWords, productDetailsArray, saveToScrapTrade, setSaveToScrapTrade }) {
 
   const TextStyle = {
     fontFamily: '"Times New Roman", Times, serif'
@@ -11,27 +16,94 @@ export function InvoiceComponent({ invoiceNo, date, vehicleNo, receiverName, rec
 
   const invoiceRef = useRef();
   const sync = useScrapTradeSync();
+  const [busy, setBusy] = useState(false);
 
-  const downloadPDF = () => {
+  const canWhatsApp = grandTotal > 0 && grandTotal < WHATSAPP_LIMIT;
+  const needsEwayBill = grandTotal >= WHATSAPP_LIMIT;
+
+  // Blocks blank / half-filled invoices (they would also be rejected by ScrapTrade)
+  const validate = () => {
+    const missing = [];
+    if (!invoiceNo) missing.push("Invoice No");
+    if (!date) missing.push("Date");
+    if (!receiverName) missing.push("Receiver");
+    if (!productDetailsArray || productDetailsArray.length === 0) missing.push("at least one product");
+    if (missing.length) { alert(`Please fill: ${missing.join(", ")}`); return false; }
+    return true;
+  };
+
+  // Renders the invoice to an A4 PDF (does not download anything yet)
+  const buildPdf = async () => {
     const invoice = document.getElementById("invoice");
-    if (!invoice) { alert("Invoice element not found!"); return; }
-    html2canvas(invoice, { scale: 1.2, useCORS: true, logging: false, windowWidth: 794 }).then((canvas) => {
-      const imgData = canvas.toDataURL("image/jpeg", 0.6);
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const marginX = 25, marginY = 30;
-      const imgWidth = pageWidth - marginX * 2;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      pdf.addImage(imgData, "JPEG", marginX, marginY, imgWidth, imgHeight);
-      const newDate = date ? date.replaceAll(".", "-") : "nodate";
-      pdf.save(`invoice-${invoiceNo}(${newDate})${receiverName}.pdf`);
+    if (!invoice) throw new Error("Invoice element not found!");
+    const canvas = await html2canvas(invoice, { scale: 1.2, useCORS: true, logging: false, windowWidth: 794 });
+    const imgData = canvas.toDataURL("image/jpeg", 0.6);
+    const pdf = new jsPDF("p", "mm", "a4");
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const marginX = 25, marginY = 30;
+    const imgWidth = pageWidth - marginX * 2;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    pdf.addImage(imgData, "JPEG", marginX, marginY, imgWidth, imgHeight);
+    const newDate = date ? date.replaceAll(".", "-") : "nodate";
+    return { pdf, fileName: `invoice-${invoiceNo}(${newDate})${receiverName}.pdf` };
+  };
 
-      // Save the sale in ScrapTrade in the background (never blocks the download)
-      try {
-        const payload = buildInvoicePayload({ invoiceNo, date, vehicleNo, receiverName, receiverAddress, receiverGST, productDetailsArray, GST, RO, grandTotal });
-        if (payload) queueInvoiceSync(payload, pdf.output("blob"));
-      } catch (e) { console.error("Could not queue ScrapTrade sync", e); }
-    });
+  // Adds the sale to ScrapTrade in the background, only if the checkmark is ticked (never blocks the user)
+  const syncSale = (pdf) => {
+    if (!saveToScrapTrade) return;
+    try {
+      const payload = buildInvoicePayload({ invoiceNo, date, vehicleNo, receiverName, receiverAddress, receiverGST, productDetailsArray, GST, RO, grandTotal });
+      if (payload) queueInvoiceSync(payload, pdf.output("blob"));
+    } catch (e) { console.error("Could not queue ScrapTrade sync", e); }
+  };
+
+  const downloadPDF = async () => {
+    if (busy || !validate()) return;
+    setBusy(true);
+    try {
+      const { pdf, fileName } = await buildPdf();
+      pdf.save(fileName);
+      syncSale(pdf);
+    } catch (e) {
+      console.error(e);
+      alert("Could not generate the PDF. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sendWhatsApp = async () => {
+    if (busy || !validate()) return;
+    if (!canWhatsApp) { alert("WhatsApp sending is only for invoices below ₹1,00,000."); return; }
+    setBusy(true);
+    try {
+      const { pdf, fileName } = await buildPdf();
+      const message = `Invoice ${invoiceNo}/${fy} | ${date}\n${receiverName}\nAmount: ₹${Number(grandTotal).toLocaleString("en-IN")}`;
+      const file = new File([pdf.output("blob")], fileName, { type: "application/pdf" });
+
+      // 1) Phone / supported browsers: open the share sheet with the PDF attached, pick WhatsApp
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], text: message });
+          syncSale(pdf);
+          return;
+        } catch (e) {
+          if (e && e.name === "AbortError") return;   // user closed the share sheet: nothing generated, nothing saved
+          console.warn("Share failed, falling back to download + WhatsApp link", e);
+        }
+      }
+
+      // 2) Fallback (desktop): download the PDF and open the WhatsApp chat with the fixed number; attach the PDF there
+      pdf.save(fileName);
+      syncSale(pdf);
+      if (WHATSAPP_NUMBER) window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, "_blank");
+      else alert("PDF downloaded. Set VITE_WHATSAPP_NUMBER to open the WhatsApp chat automatically.");
+    } catch (e) {
+      console.error(e);
+      alert("Could not generate the PDF. Please try again.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const filledRows = productDetailsArray ? productDetailsArray.length : 0;
@@ -39,10 +111,38 @@ export function InvoiceComponent({ invoiceNo, date, vehicleNo, receiverName, rec
 
   return (
     <div style={TextStyle}>
-      <div className="flex justify-center p-5 pt-0">
-        <button onClick={downloadPDF} className="mt-6 w-full sm:w-auto bg-blue-600 text-white px-6 py-2.5 rounded-lg font-medium shadow-md hover:bg-blue-700 hover:shadow-lg transition-all duration-200 active:scale-95">
-          📄 Download PDF
-        </button>
+      <div className="flex flex-col items-center gap-3 p-5 pt-0">
+        <label className="mt-6 flex items-start gap-2 text-sm sm:text-base text-gray-800 max-w-md cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={!!saveToScrapTrade}
+            onChange={(e) => setSaveToScrapTrade(e.target.checked)}
+            className="mt-1 h-4 w-4 shrink-0"
+          />
+          <span>
+            Add this sale to ScrapTrade when the PDF is generated
+            <span className="text-gray-500"> (Invoice {invoiceNo || "—"}/{fy})</span>
+          </span>
+        </label>
+        {!saveToScrapTrade && (
+          <p className="text-xs sm:text-sm text-amber-600 -mt-1">Not ticked: this invoice will NOT be added to ScrapTrade sales.</p>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <button onClick={downloadPDF} disabled={busy} className="w-full sm:w-auto bg-blue-600 text-white px-6 py-2.5 rounded-lg font-medium shadow-md hover:bg-blue-700 hover:shadow-lg transition-all duration-200 active:scale-95 disabled:opacity-60">
+            {busy ? "Generating…" : "📄 Download PDF"}
+          </button>
+          {canWhatsApp && (
+            <button onClick={sendWhatsApp} disabled={busy} className="w-full sm:w-auto bg-green-600 text-white px-6 py-2.5 rounded-lg font-medium shadow-md hover:bg-green-700 hover:shadow-lg transition-all duration-200 active:scale-95 disabled:opacity-60">
+              💬 Send on WhatsApp
+            </button>
+          )}
+        </div>
+        {needsEwayBill && (
+          <p className="text-xs sm:text-sm text-amber-700 text-center max-w-md">
+            Amount is ₹{Number(grandTotal).toLocaleString("en-IN")} (₹1,00,000 or more): generate the e-way bill and merge both PDFs. WhatsApp sending is turned off for this invoice.
+          </p>
+        )}
       </div>
       {sync.status !== "idle" && (
         <p className="text-center text-sm -mt-3 pb-2" style={{ color: sync.status === "saved" ? "#16a34a" : sync.status === "failed" ? "#dc2626" : "#d97706" }}>
@@ -66,12 +166,12 @@ export function InvoiceComponent({ invoiceNo, date, vehicleNo, receiverName, rec
               </strong>
             </div>
             <div className="border-b-2 border-black text-center pt-0 pb-2">
-              <strong className="tracking-wider uppercase text-xl">TAX INOVICE</strong>
+              <strong className="tracking-wider uppercase text-xl">TAX INVOICE</strong>
             </div>
             <div className="grid grid-cols-2 border-b-2 border-black">
               <div className="border-r-2 border-black">
                 <strong className="flex"><div className="px-2 w-38">Reverse Charges</div><div className="px-2 flex-1">:</div><div className="px-2 flex-1">NO</div></strong>
-                <strong className="flex"><div className="px-2 w-38">Invoice No.</div><div className="px-2 flex-1">:</div><div className="flex-1">{invoiceNo}/2026-2027</div></strong>
+                <strong className="flex"><div className="px-2 w-38">Invoice No.</div><div className="px-2 flex-1">:</div><div className="flex-1">{invoiceNo}/{fy}</div></strong>
                 <strong className="flex"><div className="px-2 w-38">Invoice Date</div><div className="px-2 flex-1">:</div><div className="px-2 flex-1">{date}</div></strong>
                 <strong className="flex"><div className="px-2 w-38">State</div><div className="px-2 flex-1">:</div><div className="px-2 flex-1">Maharashtra</div></strong>
                 <strong className="flex pb-2"><div className="px-2 w-38">State code</div><div className="px-2 flex-1">:</div><div className="px-2 flex-1">27</div></strong>

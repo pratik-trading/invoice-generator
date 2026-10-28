@@ -1,10 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useParties, ddmmyyyyToISO } from "./scrapTradeSync";
 
 const Details = ({
-  invoiceNo, setInvoiceNo,
+  invoiceNo, setInvoiceNo, invoiceNoStatus, onAutoInvoiceNo, fy,
   date, setDate,
   vehicleNo, setVehicleNo,
-  first, setfirst,
   receiverName, setReceiverName,
   receiverAddress, setReceiverAddress,
   receiverGST, setReceiverGST,
@@ -16,63 +16,20 @@ const Details = ({
   const [quantity, setQuantity] = useState('')
   const [Rate, setRate] = useState('')
 
-  const frequentReceivers = [
-    {
-      name: "SAI METALS",
-      address: "Gat No. 183, GANESH NAGAR, TALAWADE, PUNE 411062",
-      gst: "27ADLPC5170H1ZL"
-    },
-    {
-      name: "Cargos safe",
-      address: "CHAKAN MIDC PHASE-2, PUNE 410501 MAHARASHTRA ",
-      gst: "27AAOFC4513C1ZQ"
-    },
-    {
-      name: "SWANANDESHA ALLOY CASTINGS PRIVATE LIMITED",
-      address: "GAT NO 1582 SHED NO 01, TO 10, PATIL NAGAR, CHIKHALI, PUNE 412114 MAHARASHTRA",
-      gst: "27ABJCS9186J1ZH"
-    },
-    {
-      name: "Durgesh Foundry",
-      address: "Shop No.1 Gate No. 155/b NR National Wajan Kata, Jyotiba Mandir Road, Talawade, Pune",
-      gst: "27AMFPP5407P1ZI"
-    },
-    {
-      name: "ARUN TRADERS",
-      address: " GAT NO. 173, DEHU MOSHI ROAD, PUNE 411062",
-      gst: "27DJEPS6320D1ZA"
-    },
-    {
-      name: "OM SAI RAM METAL",
-      address: "At post Bhare, Taluka Mulshi, Pune",
-      gst: "27BQRPB0989F1ZJ"
-    },
-    {
-      name: "MATADI STEEL",
-      address: "Gat No. 689, shop no. 3, Chikhali-Jadhavwasti road, near Shivsai vajan kata, Chikhali, Pune 411062",
-      gst: "27ARBPC2184R1ZH"
-    },
-    {
-      name: "ABMIKA STEEL CORPORATION",
-      address: "J 394/1, MIDC BHOSARI, PUNE 411026",
-      gst: "27ADYPC6908Q1ZL"
-    },
-    {
-      name: "SWARAJ STEEL BECYCLE INDUSTRIES",
-      address: "S-29 S BLOCK BHOSARI MIDC, Pune-411026",
-      gst: "27BERPR2883G1ZT"
-    },
-    {
-      name: "Poona steel corporation",
-      address: "T General block BG 106/1, Midc Bhosari, Pune 411026",
-      gst: "27AAKPC1794P1Z5"
-    },
-    {
-      name: "SHRI RAM ENTERPRISES",
-      address: "Sr. No. 16/1, S Block, Gulve Vasti, Bhosari, Pune 411026",
-      gst: "27ATAPV1928P1Z1"
+  // Parties come from ScrapTrade (cached on this device for offline use)
+  const { parties, loading: partiesLoading, error: partiesError, reload: reloadParties } = useParties()
+  const [partyQuery, setPartyQuery] = useState(receiverName || '')
+  useEffect(() => { if (!receiverName) setPartyQuery('') }, [receiverName]) // cleared by "New Invoice"
+
+  const handlePartyPick = (value) => {
+    setPartyQuery(value)
+    const selected = parties.find(p => p.name.toLowerCase() === value.trim().toLowerCase())
+    if (selected) {
+      setReceiverName(selected.name)
+      setReceiverAddress(selected.address)
+      setReceiverGST(selected.gst)
     }
-  ];
+  }
 
   const handleAddProduct = () => {
     if (!productName || !HSN || !quantity || !Rate) {
@@ -110,13 +67,29 @@ const Details = ({
         {/* Invoice Number */}
         <div>
           <label className="block text-gray-700 font-medium mb-1">Invoice No</label>
-          <input
-            type="text"
-            value={invoiceNo || ""}
-            onChange={(e) => setInvoiceNo(e.target.value)}
-            placeholder="Enter invoice number" required
-            className="w-full border border-gray-300 rounded-lg p-2 sm:p-2.5 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <div className="flex gap-2">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={invoiceNo || ""}
+              onChange={(e) => setInvoiceNo(e.target.value)}
+              placeholder={invoiceNoStatus === 'loading' ? 'Fetching next number…' : 'Enter invoice number'} required
+              className="w-full border border-gray-300 rounded-lg p-2 sm:p-2.5 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              type="button"
+              onClick={onAutoInvoiceNo}
+              title="Get the next number from ScrapTrade"
+              className="shrink-0 border border-gray-300 rounded-lg px-3 text-sm text-gray-700 bg-white hover:bg-gray-50 active:scale-95"
+            >
+              Auto
+            </button>
+          </div>
+          <p className="mt-1 text-xs sm:text-sm text-gray-600">
+            Prints as <span className="font-medium">{invoiceNo || "—"}/{fy}</span>
+            {invoiceNoStatus === 'loading' && <span className="text-amber-600"> · checking ScrapTrade…</span>}
+            {invoiceNoStatus === 'offline' && <span className="text-amber-600"> · ScrapTrade unreachable, number is based on this device; please verify</span>}
+          </p>
         </div>
 
         {/* Date */}
@@ -124,7 +97,9 @@ const Details = ({
           <label className="block text-gray-700 font-medium mb-1">Date</label>
           <input
             type="date" required
+            value={ddmmyyyyToISO(date)}
             onChange={(e) => {
+              if (!e.target.value) return; // cleared: keep the previous date
               const [year, month, day] = e.target.value.split("-");
               const formattedDate = `${day}.${month}.${year}`;
               setDate(formattedDate);
@@ -152,23 +127,34 @@ const Details = ({
 
         {/* Frequent Receiver Dropdown */}
         <div className="mb-4">
-          <label className="block text-gray-700 font-medium mb-1">Select Frequent Receiver</label>
-          <select
-            className="w-full border border-gray-300 rounded-lg p-2 sm:p-2.5 text-sm sm:text-base bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            onChange={(e) => {
-              const selected = frequentReceivers.find(r => r.name === e.target.value);
-              if (selected) {
-                setReceiverName(selected.name);
-                setReceiverAddress(selected.address);
-                setReceiverGST(selected.gst);
-              }
-            }}
-          >
-            <option value="">-- Select Receiver --</option>
-            {frequentReceivers.map((r, index) => (
-              <option key={index} value={r.name}>{r.name}</option>
-            ))}
-          </select>
+          <label className="block text-gray-700 font-medium mb-1">Select Party (from ScrapTrade)</label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              list="party-list"
+              value={partyQuery}
+              onChange={(e) => handlePartyPick(e.target.value)}
+              placeholder={partiesLoading && !parties.length ? 'Loading parties…' : 'Type to search a party'}
+              className="w-full border border-gray-300 rounded-lg p-2 sm:p-2.5 text-sm sm:text-base bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <datalist id="party-list">
+              {parties.map((p) => (<option key={p.name} value={p.name} />))}
+            </datalist>
+            <button
+              type="button"
+              onClick={reloadParties}
+              disabled={partiesLoading}
+              title="Refresh parties from ScrapTrade"
+              className="shrink-0 border border-gray-300 rounded-lg px-3 text-sm text-gray-700 bg-white hover:bg-gray-50 active:scale-95 disabled:opacity-50"
+            >
+              {partiesLoading ? '…' : '↻'}
+            </button>
+          </div>
+          <p className="mt-1 text-xs sm:text-sm text-gray-600">
+            {parties.length} parties
+            {partiesLoading && <span className="text-amber-600"> · syncing…</span>}
+            {partiesError && <span className="text-amber-600"> · could not refresh ({partiesError}){parties.length ? ', showing saved list' : ''}</span>}
+          </p>
         </div>
 
         {/* Receiver Name */}
