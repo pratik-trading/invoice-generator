@@ -118,7 +118,7 @@ function App() {
 
     const totalAmt = productDetailsArray.reduce((sum, p) => sum + p.amount, 0)
     const totalQty = productDetailsArray.reduce((sum, p) => sum + Number(p.quantity), 0)
-    const gst = Number((2.5 * totalAmt / 100).toFixed(1))
+    const gst = Number((9 * totalAmt / 100).toFixed(1))
     const sub = Number((totalAmt + gst * 2).toFixed(1))
     const rounded = Math.round(sub)
     const ro = Number((rounded - sub).toFixed(2))
